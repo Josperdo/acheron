@@ -1,0 +1,39 @@
+# Working docs (not part of the portfolio artifact)
+CLAUDE.md
+Security.md
+ROADMAP.md
+Concept.md
+tasks/
+
+# Secrets / environment
+.env
+.env.local
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+*.tsbuildinfo
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
