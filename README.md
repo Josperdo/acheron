@@ -35,7 +35,7 @@ npm run dev
 
 ## Known limitations (v1)
 
-- Only 2 of the 4 planned escalation rules are scoped for v1 (app-owner credential escalation, group-owner self-add) — see Concept.md.
+- Only 2 of the 4 planned escalation rules are scoped for v1 (app-owner credential escalation, group-owner self-add).
 - Live Microsoft Graph ingestion is stubbed (`backend/app/ingestion/graph_api.py`); fixture mode is the only working path today.
 - No click-to-trace animation or narration panel logic yet — frontend renders a static graph.
 - Single local session against one tenant at a time; no hosting/auth UI planned for v1.
