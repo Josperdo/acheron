@@ -41,8 +41,18 @@ class Edge(BaseModel):
     type: EdgeType
 
 
+class EscalationHop(BaseModel):
+    """One step of an EscalationEdge's underlying path, for hop-by-hop animation."""
+
+    source: str
+    target: str
+    type: EdgeType
+    narration: str
+
+
 class EscalationEdge(Edge):
     """An edge computed by a rule in app/rules/, not a raw ingested relationship."""
 
     rule: str
     narration: str
+    hops: list[EscalationHop]

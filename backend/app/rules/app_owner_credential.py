@@ -10,7 +10,7 @@ Graph shape this looks for: Identity --OwnsApp--> Resource(app) --AppHasRole--> 
 
 import networkx as nx
 
-from app.models.graph_models import EdgeType, EscalationEdge, NodeType, PrivilegeTier
+from app.models.graph_models import EdgeType, EscalationEdge, EscalationHop, NodeType, PrivilegeTier
 from app.rules._shared import has_edge_type
 
 RULE_NAME = "app_owner_credential"
@@ -51,6 +51,32 @@ def find_app_owner_credential_paths(graph: nx.MultiDiGraph) -> list[EscalationEd
                             f"{identity_data['display_name']} can add credentials → "
                             f"{identity_data['display_name']} becomes {role_data['display_name']}"
                         ),
+                        hops=[
+                            EscalationHop(
+                                source=identity_id,
+                                target=app_id,
+                                type=EdgeType.OWNS_APP,
+                                narration=f"{identity_data['display_name']} owns {app_data['display_name']}",
+                            ),
+                            EscalationHop(
+                                source=app_id,
+                                target=role_id,
+                                type=EdgeType.APP_HAS_ROLE,
+                                narration=f"app holds {role_data['display_name']}",
+                            ),
+                            EscalationHop(
+                                source=identity_id,
+                                target=app_id,
+                                type=EdgeType.CAN_ADD_CREDENTIAL,
+                                narration=f"{identity_data['display_name']} can add credentials",
+                            ),
+                            EscalationHop(
+                                source=identity_id,
+                                target=role_id,
+                                type=EdgeType.ESCALATES_TO,
+                                narration=f"{identity_data['display_name']} becomes {role_data['display_name']}",
+                            ),
+                        ],
                     )
                 )
 

@@ -14,12 +14,20 @@ export interface GraphEdge {
   type: string;
 }
 
+export interface EscalationHop {
+  source: string;
+  target: string;
+  type: string;
+  narration: string;
+}
+
 export interface EscalationEdge {
   source: string;
   target: string;
   type: string;
   rule: string;
   narration: string;
+  hops: EscalationHop[];
 }
 
 export interface GraphData {

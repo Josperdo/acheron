@@ -9,7 +9,7 @@ Graph shape this looks for: Identity --CanAddMember--> Group --GroupHasRole--> R
 
 import networkx as nx
 
-from app.models.graph_models import EdgeType, EscalationEdge, NodeType, PrivilegeTier
+from app.models.graph_models import EdgeType, EscalationEdge, EscalationHop, NodeType, PrivilegeTier
 
 RULE_NAME = "group_owner_escalation"
 
@@ -47,6 +47,26 @@ def find_group_owner_escalation_paths(graph: nx.MultiDiGraph) -> list[Escalation
                             f"{identity_data['display_name']} adds themselves → "
                             f"{identity_data['display_name']} becomes {role_data['display_name']}"
                         ),
+                        hops=[
+                            EscalationHop(
+                                source=identity_id,
+                                target=group_id,
+                                type=EdgeType.CAN_ADD_MEMBER,
+                                narration=f"{identity_data['display_name']} can add members to {group_data['display_name']}",
+                            ),
+                            EscalationHop(
+                                source=group_id,
+                                target=role_id,
+                                type=EdgeType.GROUP_HAS_ROLE,
+                                narration=f"group holds {role_data['display_name']}",
+                            ),
+                            EscalationHop(
+                                source=identity_id,
+                                target=role_id,
+                                type=EdgeType.ESCALATES_TO,
+                                narration=f"{identity_data['display_name']} becomes {role_data['display_name']}",
+                            ),
+                        ],
                     )
                 )
 

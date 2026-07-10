@@ -31,6 +31,21 @@ def test_app_owner_credential_finds_alice_path():
     assert escalation.type == EdgeType.ESCALATES_TO
     assert escalation.narration
 
+    assert len(escalation.hops) == 4
+    first_hop, *_, last_hop = escalation.hops
+    assert first_hop.source == "user-alice"
+    assert first_hop.target == "app-legacy-reporting"
+    assert first_hop.type == EdgeType.OWNS_APP
+    assert last_hop.source == "user-alice"
+    assert last_hop.target == "role-global-admin"
+    assert last_hop.type == EdgeType.ESCALATES_TO
+    assert {hop.type for hop in escalation.hops} == {
+        EdgeType.OWNS_APP,
+        EdgeType.APP_HAS_ROLE,
+        EdgeType.CAN_ADD_CREDENTIAL,
+        EdgeType.ESCALATES_TO,
+    }
+
 
 def test_group_owner_escalation_finds_bob_path():
     graph = _fixture_graph()
@@ -43,6 +58,20 @@ def test_group_owner_escalation_finds_bob_path():
     assert escalation.rule == "group_owner_escalation"
     assert escalation.type == EdgeType.ESCALATES_TO
     assert escalation.narration
+
+    assert len(escalation.hops) == 3
+    first_hop, *_, last_hop = escalation.hops
+    assert first_hop.source == "user-bob"
+    assert first_hop.target == "group-privileged-ops"
+    assert first_hop.type == EdgeType.CAN_ADD_MEMBER
+    assert last_hop.source == "user-bob"
+    assert last_hop.target == "role-priv-role-admin"
+    assert last_hop.type == EdgeType.ESCALATES_TO
+    assert {hop.type for hop in escalation.hops} == {
+        EdgeType.CAN_ADD_MEMBER,
+        EdgeType.GROUP_HAS_ROLE,
+        EdgeType.ESCALATES_TO,
+    }
 
 
 def test_run_all_rules_combines_both_with_no_extras():

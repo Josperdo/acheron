@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 
-import type { GraphData, GraphNode, PrivilegeTier } from "../api/client";
+import type { EscalationHop, GraphData, GraphNode, PrivilegeTier } from "../api/client";
 
 interface RenderNode extends GraphNode {
   x?: number;
@@ -10,12 +11,20 @@ interface RenderNode extends GraphNode {
 interface RenderLink {
   source: string;
   target: string;
+  // force-graph mutates `source`/`target` in place, replacing the string
+  // ids with resolved node object references once the physics simulation
+  // runs. sourceId/targetId are untouched copies kept for activeHop
+  // matching, which needs the original string ids.
+  sourceId: string;
+  targetId: string;
+  type: string;
   isEscalation: boolean;
   label: string;
 }
 
 interface GraphViewProps {
   graph: GraphData;
+  activeHop: EscalationHop | null;
   onNodeClick: (nodeId: string) => void;
 }
 
@@ -30,13 +39,23 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+function isActiveHop(link: RenderLink, activeHop: EscalationHop | null): boolean {
+  return (
+    activeHop !== null &&
+    link.sourceId === activeHop.source &&
+    link.targetId === activeHop.target &&
+    link.type === activeHop.type
+  );
+}
+
 /**
  * Renders the identity/permission graph, distinguishing computed
  * EscalationEdge paths (amber, dashed, animated) from raw ingested edges
- * (solid gray), with a pulsing glow on Global Admin-tier nodes. Static
- * rendering only — click-to-trace edge animation is Phase 6.
+ * (solid gray), with a pulsing glow on Global Admin-tier nodes. When
+ * `activeHop` is set (click-to-trace, Phase 6), the matching link is
+ * highlighted in sequence with NarrationPanel's hop text.
  */
-export function GraphView({ graph, onNodeClick }: GraphViewProps) {
+export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
   const tierColor: Record<PrivilegeTier, string> = {
     standard: cssVar("--tier-standard"),
     elevated: cssVar("--tier-elevated"),
@@ -45,22 +64,35 @@ export function GraphView({ graph, onNodeClick }: GraphViewProps) {
   const backgroundColor = cssVar("--acheron-bg");
   const rawEdgeColor = cssVar("--acheron-border");
   const escalationEdgeColor = tierColor.elevated;
+  const activeHopColor = cssVar("--acheron-text");
 
-  const nodes: RenderNode[] = graph.nodes.map((n) => ({ ...n }));
-  const links: RenderLink[] = [
-    ...graph.edges.map((e) => ({
-      source: e.source,
-      target: e.target,
-      isEscalation: false,
-      label: e.type,
-    })),
-    ...graph.escalation_edges.map((e) => ({
-      source: e.source,
-      target: e.target,
-      isEscalation: true,
-      label: e.narration,
-    })),
-  ];
+  // Memoized so re-renders driven by the hop-stepping timer (Phase 6) don't
+  // hand force-graph a brand-new graphData object every ~1400ms, which
+  // would make it treat the graph as new data and reset node positions.
+  const nodes: RenderNode[] = useMemo(() => graph.nodes.map((n) => ({ ...n })), [graph.nodes]);
+  const links: RenderLink[] = useMemo(
+    () => [
+      ...graph.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        sourceId: e.source,
+        targetId: e.target,
+        type: e.type,
+        isEscalation: false,
+        label: e.type,
+      })),
+      ...graph.escalation_edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        sourceId: e.source,
+        targetId: e.target,
+        type: e.type,
+        isEscalation: true,
+        label: e.narration,
+      })),
+    ],
+    [graph.edges, graph.escalation_edges],
+  );
 
   return (
     <ForceGraph2D<RenderNode, RenderLink>
@@ -85,8 +117,10 @@ export function GraphView({ graph, onNodeClick }: GraphViewProps) {
         ctx.restore();
       }}
       linkLabel={(link) => link.label}
-      linkColor={(link) => (link.isEscalation ? escalationEdgeColor : rawEdgeColor)}
-      linkWidth={(link) => (link.isEscalation ? 2 : 1)}
+      linkColor={(link) =>
+        isActiveHop(link, activeHop) ? activeHopColor : link.isEscalation ? escalationEdgeColor : rawEdgeColor
+      }
+      linkWidth={(link) => (isActiveHop(link, activeHop) ? 4 : link.isEscalation ? 2 : 1)}
       linkLineDash={(link) => (link.isEscalation ? [4, 2] : null)}
       linkDirectionalParticles={(link) => (link.isEscalation ? 2 : 0)}
       linkDirectionalParticleWidth={2}
