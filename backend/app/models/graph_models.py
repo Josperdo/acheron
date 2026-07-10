@@ -25,6 +25,7 @@ class EdgeType(StrEnum):
     CAN_RESET_PASSWORD = "CanResetPassword"
     CAN_ADD_MEMBER = "CanAddMember"
     GROUP_HAS_ROLE = "GroupHasRole"
+    ESCALATES_TO = "EscalatesTo"
 
 
 class Node(BaseModel):
