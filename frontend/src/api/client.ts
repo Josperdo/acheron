@@ -14,9 +14,18 @@ export interface GraphEdge {
   type: string;
 }
 
+export interface EscalationEdge {
+  source: string;
+  target: string;
+  type: string;
+  rule: string;
+  narration: string;
+}
+
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  escalation_edges: EscalationEdge[];
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
