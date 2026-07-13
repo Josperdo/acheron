@@ -1,8 +1,8 @@
 # Acheron
 
-A local-run tool that connects to an Azure/Entra ID tenant (read-only), builds an identity/permission graph, computes real privilege-escalation paths across it, and renders those paths as an interactive, animated graph in the browser. Think "mini BloodHound for Entra ID," scoped small and built clean.
+Archero connects to a Azure/Entra ID tenant (read-only), builds an identity/permission graph, computes real privilege-escalation paths across it, and renders those paths as an interactive, animated graph in the browser. Think "mini BloodHound for Entra ID," scoped small and built clean.
 
-Clone, `docker compose up`, and watch how privilege escalation actually chains together in Entra ID against the included synthetic dataset — visualized, not just listed. Point it at a real (or sandboxed) tenant later by setting `INGESTION_MODE=live` and the app registration credentials in `.env`.
+Clone, `docker compose up`, and watch how privilege escalation actually chains together in Entra ID against the included synthetic dataset. Visualized, not just listed. Point it at a real (or sandboxed) tenant later by setting `INGESTION_MODE=live` and the app registration credentials in `.env`.
 
 ## Setup
 
@@ -36,6 +36,5 @@ npm run dev
 ## Known limitations (v1)
 
 - Only 2 of the 4 planned escalation rules are scoped for v1 (app-owner credential escalation, group-owner self-add).
-- Live Microsoft Graph ingestion is stubbed (`backend/app/ingestion/graph_api.py`); fixture mode is the only working path today.
-- No click-to-trace animation or narration panel logic yet — frontend renders a static graph.
+- Live Microsoft Graph ingestion (`backend/app/ingestion/graph_api.py`) covers what those 2 rules need: users, app ownership/credential capability, app service-principal role assignments, group ownership/membership capability, group role assignments. Broader ingestion (service principals as identities, direct user group membership and role assignments) isn't implemented yet.
 - Single local session against one tenant at a time; no hosting/auth UI planned for v1.

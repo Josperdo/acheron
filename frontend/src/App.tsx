@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getGraph, type GraphData } from "./api/client";
 import { GraphView } from "./components/GraphView";
+import { Legend } from "./components/Legend";
 import { NarrationPanel } from "./components/NarrationPanel";
 
 const HOP_INTERVAL_MS = 1400;
@@ -45,12 +46,28 @@ export default function App() {
   const activeHop = hopQueue[hopIndex] ?? null;
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      <main style={{ flex: 1, position: "relative" }}>
-        {error && <p style={{ color: "var(--tier-global-admin)", padding: 16 }}>{error}</p>}
-        {graph && <GraphView graph={graph} activeHop={activeHop} onNodeClick={setSelectedNodeId} />}
-      </main>
-      <NarrationPanel selectedNodeDisplayName={selectedNodeDisplayName} hopQueue={hopQueue} hopIndex={hopIndex} />
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <header
+        style={{
+          borderBottom: "1px solid var(--acheron-border)",
+          background: "var(--acheron-panel-bg)",
+          padding: "10px 16px",
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontWeight: 700, letterSpacing: 1 }}>ACHERON</span>
+        <span style={{ color: "var(--acheron-text-dim)", fontSize: 13, marginLeft: 10 }}>
+          Entra ID Attack Path Visualizer
+        </span>
+      </header>
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        <main style={{ flex: 1, position: "relative" }}>
+          <Legend />
+          {error && <p style={{ color: "var(--tier-global-admin)", padding: 16 }}>{error}</p>}
+          {graph && <GraphView graph={graph} activeHop={activeHop} onNodeClick={setSelectedNodeId} />}
+        </main>
+        <NarrationPanel selectedNodeDisplayName={selectedNodeDisplayName} hopQueue={hopQueue} hopIndex={hopIndex} />
+      </div>
     </div>
   );
 }

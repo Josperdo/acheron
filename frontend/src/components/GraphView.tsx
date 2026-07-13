@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import ForceGraph2D from "react-force-graph-2d";
+import { useEffect, useMemo, useRef } from "react";
+import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
 
 import type { EscalationHop, GraphData, GraphNode, PrivilegeTier } from "../api/client";
 
@@ -28,6 +28,12 @@ interface GraphViewProps {
   onNodeClick: (nodeId: string) => void;
 }
 
+const NODE_SIZE: Record<PrivilegeTier, number> = {
+  standard: 3,
+  elevated: 5,
+  global_admin: 7,
+};
+
 /**
  * Canvas 2D fillStyle/strokeStyle don't understand CSS `var(--x)` syntax —
  * that's a CSS-cascade feature the Canvas API never resolves. Colors used
@@ -51,9 +57,12 @@ function isActiveHop(link: RenderLink, activeHop: EscalationHop | null): boolean
 /**
  * Renders the identity/permission graph, distinguishing computed
  * EscalationEdge paths (amber, dashed, animated) from raw ingested edges
- * (solid gray), with a pulsing glow on Global Admin-tier nodes. When
- * `activeHop` is set (click-to-trace, Phase 6), the matching link is
- * highlighted in sequence with NarrationPanel's hop text.
+ * (solid gray), with a pulsing glow + size hierarchy on Global Admin-tier
+ * nodes. Node names show on hover (nodeLabel) rather than always-on canvas
+ * text — with several nodes close together, permanent labels overlapped
+ * and read as clutter. When `activeHop` is set (click-to-trace, Phase 6),
+ * the matching link is highlighted in sequence with NarrationPanel's hop
+ * text.
  */
 export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
   const tierColor: Record<PrivilegeTier, string> = {
@@ -62,9 +71,26 @@ export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
     global_admin: cssVar("--tier-global-admin"),
   };
   const backgroundColor = cssVar("--acheron-bg");
-  const rawEdgeColor = cssVar("--acheron-border");
+  // --acheron-border is a subtle UI-divider color, too low-contrast against
+  // the canvas background to read as a graph edge; --acheron-text-dim (used
+  // for secondary text elsewhere) has better contrast while staying muted
+  // relative to the amber escalation edges.
+  const rawEdgeColor = cssVar("--acheron-text-dim");
   const escalationEdgeColor = tierColor.elevated;
   const activeHopColor = cssVar("--acheron-text");
+
+  const fgRef = useRef<ForceGraphMethods<RenderNode, RenderLink> | undefined>(undefined);
+  const hasZoomedToFit = useRef(false);
+
+  // d3-force's default charge (repulsion) force has no falloff distance, so
+  // even fully disconnected components keep weakly pushing each other apart
+  // for as long as the simulation runs — visibly drifting/reframing for
+  // several seconds after load. Capping the range fixes it; a short
+  // cooldown makes it settle quickly instead of drifting for the default 15s.
+  useEffect(() => {
+    const chargeForce = fgRef.current?.d3Force("charge");
+    chargeForce?.distanceMax?.(300);
+  }, []);
 
   // Memoized so re-renders driven by the hop-stepping timer (Phase 6) don't
   // hand force-graph a brand-new graphData object every ~1400ms, which
@@ -96,12 +122,25 @@ export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
 
   return (
     <ForceGraph2D<RenderNode, RenderLink>
+      ref={fgRef}
       graphData={{ nodes, links }}
       backgroundColor={backgroundColor}
       autoPauseRedraw={false}
+      cooldownTime={4000}
+      onEngineStop={() => {
+        if (hasZoomedToFit.current) return;
+        hasZoomedToFit.current = true;
+        fgRef.current?.zoomToFit(600, 60);
+      }}
       nodeLabel={(node) => node.display_name}
       nodeColor={(node) => tierColor[node.tier]}
-      nodeCanvasObjectMode="before"
+      nodeVal={(node) => NODE_SIZE[node.tier]}
+      // Passing a plain string here would be misread by the underlying
+      // accessor-fn helper as "look up this field name on each node" (the
+      // standard d3-accessor convention), not "use this literal constant" —
+      // it'd silently evaluate to undefined for every node and this mode
+      // check would never match. Wrapping in a function forces the literal.
+      nodeCanvasObjectMode={() => "before"}
       nodeCanvasObject={(node, ctx) => {
         if (node.tier !== "global_admin" || node.x === undefined || node.y === undefined) {
           return;
