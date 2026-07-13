@@ -1,8 +1,8 @@
 # Acheron
 
 ![CI](https://github.com/Josperdo/acheron/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/github/license/Josperdo/acheron/blob/main/LICENSE)
-![Last commit](https://img.shields.io/github/last-commit/Josperdo/[acheron](https://github.com/Josperdo/acheron/commits/main))
+![License](https://img.shields.io/github/license/Josperdo/acheron)
+![Last commit](https://img.shields.io/github/last-commit/Josperdo/acheron)
 
 Archero connects to a Azure/Entra ID tenant (read-only), builds an identity/permission graph, computes real privilege-escalation paths across it, and renders those paths as an interactive, animated graph in the browser. Think "mini BloodHound for Entra ID," scoped small and built clean.
 
