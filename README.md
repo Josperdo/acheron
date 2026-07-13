@@ -1,8 +1,8 @@
 # Acheron
 
-![CI](https://github.com/Josperdo/acheron/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/github/license/Josperdo/acheron)
-![Last commit](https://img.shields.io/github/last-commit/Josperdo/acheron)
+[![CI](https://github.com/Josperdo/acheron/actions/workflows/ci.yml/badge.svg)](https://github.com/Josperdo/acheron/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Josperdo/acheron)](https://github.com/Josperdo/acheron/blob/main/LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/Josperdo/acheron)](https://github.com/Josperdo/acheron/commits/main)
 
 🚧 Actively developed — v1 in progress. See [Known limitations](#known-limitations-v1) below.
 
