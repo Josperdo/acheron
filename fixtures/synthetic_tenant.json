@@ -1,31 +1,60 @@
 {
-  "_comment": "Synthetic Entra ID tenant for local development — no real tenant required. Wired to exercise v1 escalation rules 1 and 2 (see ROADMAP.md), plus benign noise so the graph isn't trivially all-privileged.",
+  "_comment": "Synthetic Entra ID tenant for local development — no real tenant required. Wired to exercise v1 escalation rules 1 and 2 (see ROADMAP.md). Alice has two ranked escalation paths of different hop-counts; eve has an independent third path; henry and the other identities are benign noise woven into the same apps/groups as the real paths so the graph reads as one connected attack surface instead of isolated shapes.",
   "nodes": [
     { "id": "user-alice", "type": "identity", "display_name": "alice@acheron-demo.onmicrosoft.com", "tier": "standard" },
     { "id": "user-bob", "type": "identity", "display_name": "bob@acheron-demo.onmicrosoft.com", "tier": "standard" },
     { "id": "user-carol", "type": "identity", "display_name": "carol@acheron-demo.onmicrosoft.com", "tier": "standard" },
     { "id": "user-dana", "type": "identity", "display_name": "dana@acheron-demo.onmicrosoft.com", "tier": "standard" },
+    { "id": "user-eve", "type": "identity", "display_name": "eve@acheron-demo.onmicrosoft.com", "tier": "standard" },
+    { "id": "user-frank", "type": "identity", "display_name": "frank@acheron-demo.onmicrosoft.com", "tier": "standard" },
+    { "id": "user-grace", "type": "identity", "display_name": "grace@acheron-demo.onmicrosoft.com", "tier": "standard" },
+    { "id": "user-henry", "type": "identity", "display_name": "henry@acheron-demo.onmicrosoft.com", "tier": "standard" },
 
     { "id": "app-legacy-reporting", "type": "resource", "display_name": "LegacyReportingApp", "tier": "standard" },
     { "id": "app-timesheet", "type": "resource", "display_name": "TimesheetSyncApp", "tier": "standard" },
+    { "id": "app-payroll-sync", "type": "resource", "display_name": "PayrollSyncApp", "tier": "standard" },
+    { "id": "app-internal-wiki", "type": "resource", "display_name": "InternalWikiApp", "tier": "standard" },
+    { "id": "app-deployment-bot", "type": "resource", "display_name": "DeploymentBotApp", "tier": "standard" },
 
     { "id": "group-privileged-ops", "type": "group", "display_name": "Privileged-Ops", "tier": "standard" },
     { "id": "group-finance-readers", "type": "group", "display_name": "Finance-Readers", "tier": "standard" },
+    { "id": "group-security-admins", "type": "group", "display_name": "Security-Admins", "tier": "standard" },
+    { "id": "group-helpdesk", "type": "group", "display_name": "Helpdesk", "tier": "standard" },
 
     { "id": "role-global-admin", "type": "role", "display_name": "Global Administrator", "tier": "global_admin" },
-    { "id": "role-priv-role-admin", "type": "role", "display_name": "Privileged Role Administrator", "tier": "elevated" }
+    { "id": "role-priv-role-admin", "type": "role", "display_name": "Privileged Role Administrator", "tier": "elevated" },
+    { "id": "role-app-admin", "type": "role", "display_name": "Application Administrator", "tier": "elevated" },
+    { "id": "role-security-admin", "type": "role", "display_name": "Security Administrator", "tier": "elevated" },
+    { "id": "role-directory-readers", "type": "role", "display_name": "Directory Readers", "tier": "standard" }
   ],
   "edges": [
     { "source": "user-alice", "target": "app-legacy-reporting", "type": "OwnsApp" },
     { "source": "user-alice", "target": "app-legacy-reporting", "type": "CanAddCredential" },
     { "source": "app-legacy-reporting", "target": "role-global-admin", "type": "AppHasRole" },
 
+    { "source": "user-alice", "target": "group-security-admins", "type": "CanAddMember" },
+    { "source": "group-security-admins", "target": "role-security-admin", "type": "GroupHasRole" },
+
     { "source": "user-bob", "target": "group-privileged-ops", "type": "CanAddMember" },
     { "source": "group-privileged-ops", "target": "role-priv-role-admin", "type": "GroupHasRole" },
 
+    { "source": "user-eve", "target": "app-payroll-sync", "type": "OwnsApp" },
+    { "source": "user-eve", "target": "app-payroll-sync", "type": "CanAddCredential" },
+    { "source": "app-payroll-sync", "target": "role-app-admin", "type": "AppHasRole" },
+
     { "source": "user-carol", "target": "app-timesheet", "type": "OwnsApp" },
+    { "source": "user-carol", "target": "group-finance-readers", "type": "MemberOf" },
 
     { "source": "user-dana", "target": "group-finance-readers", "type": "MemberOf" },
-    { "source": "user-carol", "target": "group-finance-readers", "type": "MemberOf" }
+    { "source": "user-dana", "target": "group-helpdesk", "type": "CanAddMember" },
+
+    { "source": "user-frank", "target": "app-legacy-reporting", "type": "OwnsApp" },
+
+    { "source": "user-grace", "target": "group-privileged-ops", "type": "MemberOf" },
+    { "source": "user-grace", "target": "app-deployment-bot", "type": "OwnsApp" },
+
+    { "source": "user-henry", "target": "app-internal-wiki", "type": "OwnsApp" },
+    { "source": "user-henry", "target": "app-internal-wiki", "type": "CanAddCredential" },
+    { "source": "app-internal-wiki", "target": "role-directory-readers", "type": "AppHasRole" }
   ]
 }

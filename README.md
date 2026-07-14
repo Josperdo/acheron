@@ -10,6 +10,44 @@ Archeron connects to a Azure/Entra ID tenant (read-only), builds an identity/per
 
 Clone, `docker compose up`, and watch how privilege escalation actually chains together in Entra ID against the included synthetic dataset. Visualized, not just listed. Point it at a real (or sandboxed) tenant later by setting `INGESTION_MODE=live` and the app registration credentials in `.env`.
 
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph FE["Frontend — React + Vite + TypeScript"]
+        direction TB
+        App["App.tsx"]
+        GraphView["GraphView.tsx<br/>(react-force-graph-2d)"]
+        Narration["NarrationPanel.tsx"]
+        App --> GraphView
+        App --> Narration
+    end
+
+    subgraph BE["Backend — FastAPI"]
+        direction TB
+        Route["/graph route"]
+        Build["graph/builder.py<br/>networkx MultiDiGraph"]
+        Rules["rules/engine.py<br/>app_owner_credential + group_owner_escalation"]
+        Route --> Build --> Rules
+    end
+
+    subgraph ING["Ingestion — INGESTION_MODE switch"]
+        direction TB
+        Fixture["ingestion/fixtures.py<br/>synthetic_tenant.json"]
+        Live["ingestion/graph_api.py<br/>azure-identity + msgraph-sdk"]
+    end
+
+    Graph[("Microsoft Graph API<br/>(read-only scopes)")]
+
+    App -- "GET /graph" --> Route
+    Route -- "fixture mode (default)" --> Fixture
+    Route -- "live mode" --> Live
+    Live --> Graph
+    Fixture --> Build
+    Live --> Build
+    Rules -- "nodes, edges,<br/>escalation_edges (JSON)" --> App
+```
+
 ## Setup
 
 ```

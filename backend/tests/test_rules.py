@@ -23,8 +23,8 @@ def test_app_owner_credential_finds_alice_path():
     graph = _fixture_graph()
     escalations = find_app_owner_credential_paths(graph)
 
-    assert len(escalations) == 1
-    escalation = escalations[0]
+    assert len(escalations) == 2
+    escalation = next(e for e in escalations if e.source == "user-alice")
     assert escalation.source == "user-alice"
     assert escalation.target == "role-global-admin"
     assert escalation.rule == "app_owner_credential"
@@ -51,8 +51,8 @@ def test_group_owner_escalation_finds_bob_path():
     graph = _fixture_graph()
     escalations = find_group_owner_escalation_paths(graph)
 
-    assert len(escalations) == 1
-    escalation = escalations[0]
+    assert len(escalations) == 2
+    escalation = next(e for e in escalations if e.source == "user-bob")
     assert escalation.source == "user-bob"
     assert escalation.target == "role-priv-role-admin"
     assert escalation.rule == "group_owner_escalation"
@@ -78,9 +78,21 @@ def test_run_all_rules_combines_both_with_no_extras():
     graph = _fixture_graph()
     escalations = run_all_rules(graph)
 
-    assert len(escalations) == 2
+    assert len(escalations) == 4
     sources = {e.source for e in escalations}
-    assert sources == {"user-alice", "user-bob"}
+    assert sources == {"user-alice", "user-bob", "user-eve"}
+
+
+def test_alice_has_multiple_ranked_escalation_paths():
+    graph = _fixture_graph()
+    escalations = [e for e in run_all_rules(graph) if e.source == "user-alice"]
+
+    assert len(escalations) == 2
+    hop_counts = sorted(len(e.hops) for e in escalations)
+    assert hop_counts == [3, 4]
+
+    targets = {e.target for e in escalations}
+    assert targets == {"role-security-admin", "role-global-admin"}
 
 
 def test_app_owner_without_can_add_credential_does_not_escalate():
