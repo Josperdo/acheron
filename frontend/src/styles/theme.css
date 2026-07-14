@@ -1,4 +1,5 @@
-:root {
+:root,
+:root[data-theme="dark"] {
   --acheron-bg: #0a0e14;
   --acheron-panel-bg: #12161f;
   --acheron-border: #232936;
@@ -8,6 +9,35 @@
   --tier-standard: #3ecf6e;
   --tier-elevated: #e6a53c;
   --tier-global-admin: #e64c3c;
+
+  /* Fixed text color for content drawn on top of a bright tier-colored
+     fill (badges, stepper markers) — not the same thing as page text
+     color, which flips with the theme. */
+  --on-accent: #0a0e14;
+
+  /* Lighter "spotlight" center for the graph pane's vignette gradient. */
+  --acheron-vignette-center: #131a26;
+}
+
+:root[data-theme="light"] {
+  --acheron-bg: #f5f6f8;
+  --acheron-panel-bg: #ffffff;
+  --acheron-border: #d8dce3;
+  --acheron-text: #1a1f28;
+  --acheron-text-dim: #5b6472;
+
+  /* Darkened from the dark-mode values — those were tuned for contrast
+     against near-black and would fail basic legibility on a white panel
+     (the amber especially). Hue stays recognizable as green/amber/red. */
+  --tier-standard: #1f9e52;
+  --tier-elevated: #b8720a;
+  --tier-global-admin: #c93a2c;
+
+  --on-accent: #0a0e14;
+
+  /* A "spotlight glow" effect doesn't read well on a white background —
+     flat (no visible gradient) is correct here. */
+  --acheron-vignette-center: var(--acheron-bg);
 }
 
 * {

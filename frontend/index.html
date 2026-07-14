@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Acheron — Entra ID Attack Path Visualizer</title>
+    <script>
+      // Set the theme attribute before first paint so there's no flash of
+      // the wrong theme — this must run before the app mounts, not in a
+      // React effect (which only fires after an initial render/paint).
+      (function () {
+        var stored = localStorage.getItem("acheron-theme");
+        var theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods } from "react-force-graph-2d";
 
 import type { EscalationHop, GraphData, GraphNode, PrivilegeTier } from "../api/client";
+import type { Theme } from "../hooks/useTheme";
 
 interface RenderNode extends GraphNode {
   x?: number;
@@ -26,6 +27,10 @@ interface GraphViewProps {
   graph: GraphData;
   activeHop: EscalationHop | null;
   onNodeClick: (nodeId: string) => void;
+  // Not read directly — canvas can't react to CSS changes on its own, so
+  // this exists purely to force a re-render (and thus a fresh cssVar()
+  // resolution + repaint) when the theme toggles. See useTheme.ts.
+  theme: Theme;
 }
 
 const NODE_SIZE: Record<PrivilegeTier, number> = {
@@ -64,13 +69,21 @@ function isActiveHop(link: RenderLink, activeHop: EscalationHop | null): boolean
  * the matching link is highlighted in sequence with NarrationPanel's hop
  * text.
  */
-export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
+export function GraphView({ graph, activeHop, onNodeClick, theme }: GraphViewProps) {
+  // theme itself isn't read — its only job is to be a prop that changes,
+  // forcing this component to re-render (and thus re-resolve cssVar()
+  // below with the new palette) when the theme toggles.
+  void theme;
+
   const tierColor: Record<PrivilegeTier, string> = {
     standard: cssVar("--tier-standard"),
     elevated: cssVar("--tier-elevated"),
     global_admin: cssVar("--tier-global-admin"),
   };
-  const backgroundColor = cssVar("--acheron-bg");
+  // Transparent so App.tsx's subtle radial-gradient vignette on `main`
+  // (behind this canvas) actually shows through — the canvas would
+  // otherwise paint an opaque fill over the entire pane every frame.
+  const backgroundColor = "rgba(0, 0, 0, 0)";
   // --acheron-border is a subtle UI-divider color, too low-contrast against
   // the canvas background to read as a graph edge; --acheron-text-dim (used
   // for secondary text elsewhere) has better contrast while staying muted
@@ -81,6 +94,30 @@ export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
 
   const fgRef = useRef<ForceGraphMethods<RenderNode, RenderLink> | undefined>(undefined);
   const hasZoomedToFit = useRef(false);
+
+  // react-force-graph-2d's own container auto-sizing only reliably fires
+  // once at mount in nested flex layouts like this one (header + graph pane
+  // + narration panel) — it doesn't robustly track later layout shifts,
+  // e.g. when NarrationPanel's content changes width/height on click. That
+  // leaves the canvas's internal drawing-buffer size out of sync with its
+  // actual CSS box, which shows up as nodes/edges appearing clipped near
+  // the pane edge. Measuring the wrapper explicitly and passing width/height
+  // as props sidesteps the library's own (less reliable) detection entirely.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setDimensions({ width, height });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // d3-force's default charge (repulsion) force has no falloff distance, so
   // even fully disconnected components keep weakly pushing each other apart
@@ -121,49 +158,53 @@ export function GraphView({ graph, activeHop, onNodeClick }: GraphViewProps) {
   );
 
   return (
-    <ForceGraph2D<RenderNode, RenderLink>
-      ref={fgRef}
-      graphData={{ nodes, links }}
-      backgroundColor={backgroundColor}
-      autoPauseRedraw={false}
-      cooldownTime={4000}
-      onEngineStop={() => {
-        if (hasZoomedToFit.current) return;
-        hasZoomedToFit.current = true;
-        fgRef.current?.zoomToFit(600, 60);
-      }}
-      nodeLabel={(node) => node.display_name}
-      nodeColor={(node) => tierColor[node.tier]}
-      nodeVal={(node) => NODE_SIZE[node.tier]}
-      // Passing a plain string here would be misread by the underlying
-      // accessor-fn helper as "look up this field name on each node" (the
-      // standard d3-accessor convention), not "use this literal constant" —
-      // it'd silently evaluate to undefined for every node and this mode
-      // check would never match. Wrapping in a function forces the literal.
-      nodeCanvasObjectMode={() => "before"}
-      nodeCanvasObject={(node, ctx) => {
-        if (node.tier !== "global_admin" || node.x === undefined || node.y === undefined) {
-          return;
+    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
+      <ForceGraph2D<RenderNode, RenderLink>
+        ref={fgRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        graphData={{ nodes, links }}
+        backgroundColor={backgroundColor}
+        autoPauseRedraw={false}
+        cooldownTime={4000}
+        onEngineStop={() => {
+          if (hasZoomedToFit.current) return;
+          hasZoomedToFit.current = true;
+          fgRef.current?.zoomToFit(600, 60);
+        }}
+        nodeLabel={(node) => node.display_name}
+        nodeColor={(node) => tierColor[node.tier]}
+        nodeVal={(node) => NODE_SIZE[node.tier]}
+        // Passing a plain string here would be misread by the underlying
+        // accessor-fn helper as "look up this field name on each node" (the
+        // standard d3-accessor convention), not "use this literal constant" —
+        // it'd silently evaluate to undefined for every node and this mode
+        // check would never match. Wrapping in a function forces the literal.
+        nodeCanvasObjectMode={() => "before"}
+        nodeCanvasObject={(node, ctx) => {
+          if (node.tier !== "global_admin" || node.x === undefined || node.y === undefined) {
+            return;
+          }
+          const pulse = (Math.sin(Date.now() / 300) + 1) / 2; // oscillates 0..1
+          const radius = 6 + pulse * 6;
+          ctx.save();
+          ctx.globalAlpha = 0.4 * (1 - pulse) + 0.1;
+          ctx.fillStyle = tierColor.global_admin;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.restore();
+        }}
+        linkLabel={(link) => link.label}
+        linkColor={(link) =>
+          isActiveHop(link, activeHop) ? activeHopColor : link.isEscalation ? escalationEdgeColor : rawEdgeColor
         }
-        const pulse = (Math.sin(Date.now() / 300) + 1) / 2; // oscillates 0..1
-        const radius = 6 + pulse * 6;
-        ctx.save();
-        ctx.globalAlpha = 0.4 * (1 - pulse) + 0.1;
-        ctx.fillStyle = tierColor.global_admin;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.restore();
-      }}
-      linkLabel={(link) => link.label}
-      linkColor={(link) =>
-        isActiveHop(link, activeHop) ? activeHopColor : link.isEscalation ? escalationEdgeColor : rawEdgeColor
-      }
-      linkWidth={(link) => (isActiveHop(link, activeHop) ? 4 : link.isEscalation ? 2 : 1)}
-      linkLineDash={(link) => (link.isEscalation ? [4, 2] : null)}
-      linkDirectionalParticles={(link) => (link.isEscalation ? 2 : 0)}
-      linkDirectionalParticleWidth={2}
-      onNodeClick={(node) => onNodeClick(node.id as string)}
-    />
+        linkWidth={(link) => (isActiveHop(link, activeHop) ? 4 : link.isEscalation ? 2 : 1)}
+        linkLineDash={(link) => (link.isEscalation ? [4, 2] : null)}
+        linkDirectionalParticles={(link) => (link.isEscalation ? 2 : 0)}
+        linkDirectionalParticleWidth={2}
+        onNodeClick={(node) => onNodeClick(node.id as string)}
+      />
+    </div>
   );
 }

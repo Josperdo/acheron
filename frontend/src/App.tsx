@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { getGraph, type EscalationHop, type GraphData } from "./api/client";
+import { getGraph, type EscalationHop, type GraphData, type PrivilegeTier } from "./api/client";
+import { BlastRadiusSummary, type BlastRadiusEntry } from "./components/BlastRadiusSummary";
 import { GraphView } from "./components/GraphView";
 import { Legend } from "./components/Legend";
 import { NarrationPanel, type QueuedHop } from "./components/NarrationPanel";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { useTheme } from "./hooks/useTheme";
 
 const HOP_INTERVAL_MS = 1400;
 
 export default function App() {
+  const { theme, toggle: toggleTheme } = useTheme();
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hopIndex, setHopIndex] = useState(0);
@@ -16,6 +20,32 @@ export default function App() {
   useEffect(() => {
     getGraph().then(setGraph).catch((err: Error) => setError(err.message));
   }, []);
+
+  // Shared summary of every escalation edge, ranked shortest-first — one
+  // source of truth for "what can reach what, how directly," feeding both
+  // the header's blast-radius stat/dropdown and (filtered per-identity)
+  // the click-to-trace hop queue below.
+  const blastRadiusEntries: BlastRadiusEntry[] = useMemo(() => {
+    if (graph === null) return [];
+    return graph.escalation_edges
+      .map((edge) => {
+        const identity = graph.nodes.find((n) => n.id === edge.source);
+        const target = graph.nodes.find((n) => n.id === edge.target);
+        return {
+          identityId: edge.source,
+          identityDisplayName: identity?.display_name ?? edge.source,
+          targetDisplayName: target?.display_name ?? edge.target,
+          targetTier: target?.tier ?? ("standard" as PrivilegeTier),
+          hopCount: edge.hops.length,
+        };
+      })
+      .sort((a, b) => a.hopCount - b.hopCount);
+  }, [graph]);
+
+  const blastRadius = useMemo(
+    () => new Set(blastRadiusEntries.map((e) => e.identityId)).size,
+    [blastRadiusEntries],
+  );
 
   // Ranked, path-aware hop queue: an identity can have more than one
   // escalation path (see fixtures/synthetic_tenant.json — alice has two).
@@ -40,6 +70,7 @@ export default function App() {
           hopIndexInPath,
           hopCountInPath: path.hops.length,
           pathTargetDisplayName: targetNode?.display_name ?? path.target,
+          pathTargetTier: targetNode?.tier ?? "standard",
         }),
       );
     });
@@ -66,25 +97,19 @@ export default function App() {
     selectedNodeId === null ? null : (graph?.nodes.find((n) => n.id === selectedNodeId)?.display_name ?? selectedNodeId);
   const activeHop: EscalationHop | null = hopQueue[hopIndex] ?? null;
 
-  // "Blast radius" — distinct identities with at least one escalation
-  // path. Computed client-side from data already in the /graph response;
-  // no backend change needed.
-  const blastRadius = useMemo(() => {
-    if (graph === null) return null;
-    return new Set(graph.escalation_edges.map((e) => e.source)).size;
-  }, [graph]);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
         style={{
           display: "flex",
-          alignItems: "baseline",
+          alignItems: "center",
           justifyContent: "space-between",
           borderBottom: "1px solid var(--acheron-border)",
           background: "var(--acheron-panel-bg)",
           padding: "10px 16px",
           flexShrink: 0,
+          position: "relative",
+          zIndex: 10,
         }}
       >
         <div>
@@ -93,17 +118,25 @@ export default function App() {
             Entra ID Attack Path Visualizer
           </span>
         </div>
-        {blastRadius !== null && blastRadius > 0 && (
-          <span style={{ color: "var(--tier-elevated)", fontSize: 13, fontWeight: 600 }}>
-            ⚠ {blastRadius} identit{blastRadius === 1 ? "y" : "ies"} can reach a privileged role
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {blastRadius > 0 && (
+            <BlastRadiusSummary count={blastRadius} entries={blastRadiusEntries} onSelectIdentity={setSelectedNodeId} />
+          )}
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
       </header>
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <main style={{ flex: 1, position: "relative" }}>
+        <main
+          style={{
+            flex: 1,
+            position: "relative",
+            overflow: "hidden",
+            background: "radial-gradient(ellipse at 50% 35%, var(--acheron-vignette-center) 0%, var(--acheron-bg) 65%)",
+          }}
+        >
           <Legend />
           {error && <p style={{ color: "var(--tier-global-admin)", padding: 16 }}>{error}</p>}
-          {graph && <GraphView graph={graph} activeHop={activeHop} onNodeClick={setSelectedNodeId} />}
+          {graph && <GraphView graph={graph} activeHop={activeHop} onNodeClick={setSelectedNodeId} theme={theme} />}
         </main>
         <NarrationPanel selectedNodeDisplayName={selectedNodeDisplayName} hopQueue={hopQueue} hopIndex={hopIndex} />
       </div>
