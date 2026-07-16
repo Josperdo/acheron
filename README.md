@@ -6,7 +6,7 @@
 
 🚧 Actively developed — v1 in progress. See [Known limitations](#known-limitations-v1) below.
 
-Archeron connects to a Azure/Entra ID tenant (read-only), builds an identity/permission graph, computes real privilege-escalation paths across it, and renders those paths as an interactive, animated graph in the browser. Think "mini BloodHound for Entra ID," scoped small and built clean.
+Acheron connects to an Azure/Entra ID tenant (read-only), builds an identity/permission graph, computes real privilege-escalation paths across it, and renders those paths as an interactive, animated graph in the browser. Think "mini BloodHound for Entra ID," scoped small and built clean.
 
 Clone, `docker compose up`, and watch how privilege escalation actually chains together in Entra ID against the included synthetic dataset. Visualized, not just listed. Point it at a real (or sandboxed) tenant later by setting `INGESTION_MODE=live` and the app registration credentials in `.env`.
 
@@ -74,6 +74,7 @@ npm run dev
 
 ## Security considerations
 
+- **Read-only, always.** The app registration only ever requests read-only Microsoft Graph scopes — `Directory.Read.All`, `RoleManagement.Read.Directory`, `Application.Read.All`, `Group.Read.All` — no write/modify Graph permissions are requested or used anywhere in the codebase.
 - Ships with a synthetic dataset (`fixtures/synthetic_tenant.json`) so it runs with zero Azure credentials by default.
 - `.env` (real credentials) is gitignored; only `.env.example` is committed.
 
