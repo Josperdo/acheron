@@ -9,6 +9,8 @@ real Kiota-generated models, since only those attributes are ever touched.
 import asyncio
 from types import SimpleNamespace
 
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+
 from app.ingestion.graph_api import (
     ELEVATED_ROLE_TEMPLATE_IDS,
     GLOBAL_ADMIN_ROLE_TEMPLATE_ID,
@@ -119,6 +121,12 @@ class _FakeServicePrincipalLookup:
         self._service_principal = service_principal
 
     async def get(self):
+        # Mirrors the real SDK: a missing service principal is a 404 that
+        # raises ODataError, not a None return.
+        if self._service_principal is None:
+            err = ODataError()
+            err.response_status_code = 404
+            raise err
         return self._service_principal
 
 
@@ -219,3 +227,18 @@ def test_service_principal_owner_is_skipped():
 
 def test_elevated_role_template_ids_do_not_include_global_admin():
     assert GLOBAL_ADMIN_ROLE_TEMPLATE_ID not in ELEVATED_ROLE_TEMPLATE_IDS
+
+
+def test_app_without_service_principal_is_still_ingested():
+    client = FakeGraphClient(
+        users=[_user("u-erin", "erin@example.com")],
+        applications=[_app("a-orphan", "client-orphan", "NeverConsentedApp")],
+        app_owners={"a-orphan": [_owner_user("u-erin")]},
+    )
+
+    nodes, edges = asyncio.run(load_live_tenant(client))
+
+    assert "app-a-orphan" in {n.id for n in nodes}
+    edge_signatures = {(e.source, e.target, e.type) for e in edges}
+    assert ("user-u-erin", "app-a-orphan", EdgeType.OWNS_APP) in edge_signatures
+    assert not any(e.type == EdgeType.APP_HAS_ROLE for e in edges)

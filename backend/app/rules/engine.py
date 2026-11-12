@@ -1,4 +1,4 @@
-"""Escalation rule engine — Phase 3 (see ROADMAP.md).
+"""Escalation rule engine.
 
 Each rule is its own function: `(graph: nx.MultiDiGraph) -> list[EscalationEdge]`.
 The engine's job is just to run every registered rule against the graph and

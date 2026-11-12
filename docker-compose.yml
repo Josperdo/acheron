@@ -5,9 +5,11 @@ services:
       dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      INGESTION_MODE: fixture
-      FRONTEND_ORIGIN: http://localhost:5173
+    # Optional: if .env exists, INGESTION_MODE and the AZURE_* values flow in
+    # from it. Without one, the backend defaults to fixture mode.
+    env_file:
+      - path: .env
+        required: false
 
   frontend:
     build:

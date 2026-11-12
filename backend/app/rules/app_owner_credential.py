@@ -3,7 +3,7 @@
 Identity owns an app registration; that app's service principal holds a
 privileged directory role (e.g. Global Admin); the owner can add a client
 secret/cert to an app they own, then authenticate as it. A documented, real
-Entra ID attack primitive (see Concept.md).
+Entra ID attack primitive.
 
 Graph shape this looks for: Identity --OwnsApp--> Resource(app) --AppHasRole--> Role(privileged)
 """

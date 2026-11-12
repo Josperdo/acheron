@@ -65,7 +65,7 @@ function isActiveHop(link: RenderLink, activeHop: EscalationHop | null): boolean
  * (solid gray), with a pulsing glow + size hierarchy on Global Admin-tier
  * nodes. Node names show on hover (nodeLabel) rather than always-on canvas
  * text — with several nodes close together, permanent labels overlapped
- * and read as clutter. When `activeHop` is set (click-to-trace, Phase 6),
+ * and read as clutter. When `activeHop` is set (click-to-trace),
  * the matching link is highlighted in sequence with NarrationPanel's hop
  * text.
  */
@@ -129,7 +129,7 @@ export function GraphView({ graph, activeHop, onNodeClick, theme }: GraphViewPro
     chargeForce?.distanceMax?.(300);
   }, []);
 
-  // Memoized so re-renders driven by the hop-stepping timer (Phase 6) don't
+  // Memoized so re-renders driven by the hop-stepping timer in App.tsx don't
   // hand force-graph a brand-new graphData object every ~1400ms, which
   // would make it treat the graph as new data and reset node positions.
   const nodes: RenderNode[] = useMemo(() => graph.nodes.map((n) => ({ ...n })), [graph.nodes]);

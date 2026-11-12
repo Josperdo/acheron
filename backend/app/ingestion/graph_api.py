@@ -1,14 +1,14 @@
-"""Live Microsoft Graph ingestion — Phase 4 (see ROADMAP.md).
+"""Live Microsoft Graph ingestion.
 
 Read-only scopes ONLY, ever: Directory.Read.All, RoleManagement.Read.Directory,
-Application.Read.All, Group.Read.All. See Security.md before adding any call
-here — no write/modify Graph calls are permitted in this module.
+Application.Read.All, Group.Read.All. No write/modify Graph calls are
+permitted in this module.
 
-Narrow scope (see ROADMAP.md Phase 4 / Phase 4.1): this ingests only what
-escalation rules 1-2 consume — users, app ownership + credential capability,
-an app's service-principal role assignments, group ownership + membership
-capability, and group role assignments. Direct user MemberOf/HasRole edges
-and service-principal-as-Identity nodes are deferred to Phase 4.1.
+Narrow scope: this ingests only what the two escalation rules consume —
+users, app ownership + credential capability, an app's service-principal
+role assignments, group ownership + membership capability, and group role
+assignments. Direct user MemberOf/HasRole edges and service principals as
+Identity nodes are not ingested yet (see "Known limitations" in README.md).
 
 Auth uses azure-identity (ClientSecretCredential from AZURE_TENANT_ID /
 AZURE_CLIENT_ID / AZURE_CLIENT_SECRET in .env) and msgraph-sdk for the calls
@@ -28,6 +28,7 @@ from msgraph.generated.applications.applications_request_builder import (
     ApplicationsRequestBuilder,
 )
 from msgraph.generated.groups.groups_request_builder import GroupsRequestBuilder
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.users.users_request_builder import UsersRequestBuilder
 
 from app.config import settings
@@ -39,7 +40,7 @@ OWNER_USER_ODATA_TYPE = "#microsoft.graph.user"
 # Well-known built-in directory role template IDs. A built-in
 # UnifiedRoleDefinition's `id` equals its template ID. Not every one of
 # Entra's ~100 built-in roles is classified here — anything absent defaults
-# to PrivilegeTier.STANDARD, a known simplification (see ROADMAP.md Phase 4.1).
+# to PrivilegeTier.STANDARD, a known simplification (see "Known limitations" in README.md).
 GLOBAL_ADMIN_ROLE_TEMPLATE_ID = "62e90394-69f5-4237-9190-012177145e10"
 ELEVATED_ROLE_TEMPLATE_IDS = {
     "e8611ab8-c189-46e8-94e1-60213ab1f814",  # Privileged Role Administrator
@@ -78,13 +79,12 @@ def _classify_tier(role_definition_id: str) -> PrivilegeTier:
     return PrivilegeTier.STANDARD
 
 
-def _build_client() -> GraphServiceClient:
-    credential = ClientSecretCredential(
+def _build_credential() -> ClientSecretCredential:
+    return ClientSecretCredential(
         tenant_id=settings.azure_tenant_id,
         client_id=settings.azure_client_id,
         client_secret=settings.azure_client_secret,
     )
-    return GraphServiceClient(credentials=credential, scopes=GRAPH_SCOPES)
 
 
 async def _paginate(builder: _Paginatable, request_configuration: Any = None) -> list[Any]:
@@ -144,7 +144,23 @@ def _user_owner_ids(owners: Iterable[Any]) -> Iterable[str]:
     return (owner.id for owner in owners if owner.odata_type == OWNER_USER_ODATA_TYPE)
 
 
-async def _add_role_edge(
+async def _fetch_service_principal(client: GraphServiceClient, app_id: str) -> Any | None:
+    """Look up an app registration's service principal, or None if it has none.
+
+    An app registration doesn't always have a service principal (e.g. it was
+    never consented to in this tenant). msgraph-sdk raises ODataError on a 404
+    rather than returning None, so without this one such app would abort the
+    whole ingestion.
+    """
+    try:
+        return await client.service_principals_with_app_id(app_id).get()
+    except ODataError as err:
+        if err.response_status_code == 404:
+            return None
+        raise
+
+
+def _add_role_edge(
     *,
     nodes: list[Node],
     edges: list[Edge],
@@ -182,8 +198,21 @@ async def _add_role_edge(
 async def load_live_tenant(
     client: GraphServiceClient | None = None,
 ) -> tuple[list[Node], list[Edge]]:
-    client = client or _build_client()
+    """Ingest the tenant via Microsoft Graph.
 
+    Tests pass a fake `client`. Otherwise this owns the credential and closes
+    it via `async with` when ingestion finishes — the aio credential holds an
+    HTTP session, and creating one per /graph request without closing it
+    leaks connections.
+    """
+    if client is not None:
+        return await _ingest(client)
+
+    async with _build_credential() as credential:
+        return await _ingest(GraphServiceClient(credentials=credential, scopes=GRAPH_SCOPES))
+
+
+async def _ingest(client: GraphServiceClient) -> tuple[list[Node], list[Edge]]:
     users = await _fetch_users(client)
     applications = await _fetch_applications(client)
     groups = await _fetch_groups(client)
@@ -216,9 +245,9 @@ async def load_live_tenant(
                 Edge(source=owner_node_id, target=app_node_id, type=EdgeType.CAN_ADD_CREDENTIAL)
             )
 
-        service_principal = await client.service_principals_with_app_id(app.app_id).get()
+        service_principal = await _fetch_service_principal(client, app.app_id)
         if service_principal is not None:
-            await _add_role_edge(
+            _add_role_edge(
                 nodes=nodes,
                 edges=edges,
                 role_nodes_added=role_nodes_added,
@@ -242,7 +271,7 @@ async def load_live_tenant(
                 Edge(source=owner_node_id, target=group_node_id, type=EdgeType.CAN_ADD_MEMBER)
             )
 
-        await _add_role_edge(
+        _add_role_edge(
             nodes=nodes,
             edges=edges,
             role_nodes_added=role_nodes_added,

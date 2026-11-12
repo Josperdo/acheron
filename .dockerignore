@@ -1,0 +1,15 @@
+# Backend image is built from the repo root; keep secrets and local junk out of it.
+.git
+.env
+*.env
+**/__pycache__
+**/.pytest_cache
+**/.venv
+frontend/node_modules
+.DS_Store
+CLAUDE.md
+Security.md
+SECURITY.md
+ROADMAP.md
+Concept.md
+tasks/

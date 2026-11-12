@@ -8,7 +8,10 @@ DOCKER_FIXTURES_DIR = Path("/fixtures")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Read the repo-root .env (where the README tells you to put it) regardless
+    # of which directory uvicorn is started from. A missing file is ignored,
+    # and real environment variables (e.g. from docker compose) still win.
+    model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env", extra="ignore")
 
     ingestion_mode: Literal["fixture", "live"] = "fixture"
 

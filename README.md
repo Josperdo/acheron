@@ -63,6 +63,8 @@ cp .env.example .env   # optional — defaults already run against the synthetic
 docker compose up
 ```
 
+To run against a real (or sandbox) tenant, set `INGESTION_MODE=live` and the `AZURE_*` values in the repo-root `.env`. Both Docker and the non-Docker setup below read that file.
+
 - Backend: http://localhost:8000 (`/health`, `/graph`)
 - Frontend: http://localhost:5173
 
@@ -80,6 +82,14 @@ npm install
 npm run dev
 ```
 
+### Running tests
+
+```
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Security considerations
 
 - **Read-only, always.** The app registration only ever requests read-only Microsoft Graph scopes — `Directory.Read.All`, `RoleManagement.Read.Directory`, `Application.Read.All`, `Group.Read.All` — no write/modify Graph permissions are requested or used anywhere in the codebase.
@@ -91,6 +101,17 @@ npm run dev
 - Only 2 of the 4 planned escalation rules are scoped for v1 (app-owner credential escalation, group-owner self-add).
 - Live Microsoft Graph ingestion (`backend/app/ingestion/graph_api.py`) covers what those 2 rules need: users, app ownership/credential capability, app service-principal role assignments, group ownership/membership capability, group role assignments. Broader ingestion (service principals as identities, direct user group membership and role assignments) isn't implemented yet.
 - Single local session against one tenant at a time; no hosting/auth UI planned for v1.
+- Built-in role classification is partial: Global Administrator and a handful of elevated roles are recognized; any other directory role is treated as standard.
+
+## Status: work in progress
+
+This is a side project and is still being cleaned up. Known rough edges:
+
+- **Live ingestion is sequential.** App and group owners and service principals are fetched one call at a time, so large tenants are slow. These calls should run concurrently with a concurrency cap.
+- **No caching.** Every `GET /graph` re-ingests the tenant in live mode.
+- **Rule duplication.** The two rule modules share the same traversal shape; that will move into a shared helper once a third rule exists.
+- **Frontend polish.** Styling is mostly inline and should move into `theme.css`; edge types are typed as plain `string` on the client.
+- **CI** runs backend tests and a frontend typecheck, but no linters yet.
 
 ## Lessons learned
 
